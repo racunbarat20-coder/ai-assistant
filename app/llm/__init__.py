@@ -1,0 +1,1 @@
+"""LLM package: provider-agnostic client + prompt management + SSE encoding."""

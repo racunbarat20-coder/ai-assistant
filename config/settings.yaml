@@ -1,0 +1,113 @@
+# ============================================================
+# AI Assistant - settings.yaml
+# Konfigurasi aplikasi (non-rahasia).
+# Rahasia ada di .env (LLM_API_KEY, DATABASE_URL, JWT_SECRET_KEY, ...)
+# ============================================================
+
+app:
+  name: "AI Assistant"
+  version: "0.1.0"
+  env: dev            # dev | staging | prod
+  debug: true
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  request_timeout_seconds: 120
+  cors_origins:
+    - "*"
+
+# Fitur yang bisa di-toggle
+features:
+  streaming: true
+  rag: true
+  tools: true
+  deep_analysis: true
+  guardrails: true
+
+# Default LLM (dapat di-override via .env)
+llm:
+  temperature: 0.2
+  max_tokens: 1024
+  timeout_seconds: 60
+
+rag:
+  chunk_size: 800
+  chunk_overlap: 120
+  top_k: 5
+  score_threshold: 0.55
+
+orchestrator:
+  use_llm_router: false     # true = klasifikasi via LLM, false = heuristic
+  routes:
+    - key: "simple"
+      mode: "simple"
+    - key: "knowledge"
+      mode: "rag"
+    - key: "analysis"
+      mode: "deep"
+    - key: "data_sql"
+      mode: "sql"
+  # Keyword heuristic untuk deteksi intent
+  keywords:
+    data_sql:
+      - "data"
+      - "sql"
+      - "statistik"
+      - "laporan"
+      - "total"
+      - "jumlah"
+      - "berapa"
+      - "hitung"
+      - "grafik"
+      - "tabel"
+      - "database"
+    analysis:
+      - "analisis"
+      - "analisa"
+      - "evaluasi"
+      - "bandingkan"
+      - "rekomendasi"
+      - "strategi"
+      - "tinjauan"
+      - "deep dive"
+    knowledge:
+      - "dokumen"
+      - "kebijakan"
+      - "standar"
+      - "pedoman"
+      - "knowledge"
+      - "basis pengetahuan"
+
+guardrails:
+  pre_llm:
+    prompt_injection: true
+    disallowed_topics: true
+    permission: true
+  post_llm:
+    output_validation: true
+    sensitive_masking: true
+  # Batas pertanyaan per menit per user (rate limit dasar)
+  rate_limit_per_minute: 20
+
+logging:
+  level: INFO
+  format: json        # json | text
+  redact_fields:
+    - key
+    - api_key
+    - authorization
+    - bearer
+    - token
+    - secret
+    - password
+  # Field yang boleh disimpan di audit log (whitelist)
+  audit_log_fields:
+    - message
+    - route
+    - agent
+    - tool
+    - latency_ms
+    - status
+    - error
+    - token_usage

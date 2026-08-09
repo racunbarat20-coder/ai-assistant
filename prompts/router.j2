@@ -1,0 +1,19 @@
+Classify the user message below into exactly one of the route keys below.
+Return ONLY a JSON object with keys "route" and "confidence" (0.0-1.0).
+
+Allowed routes: {{ keys|join(", ") }}
+
+Routing hints:
+- "simple": casual conversation, greetings, factual questions answerable directly.
+- "knowledge": asks about documents, policies, standards, internal knowledge base.
+- "data_sql": asks for numbers, reports, statistics, totals, queries on our data.
+- "analysis": asks for deep evaluation, comparison, strategies, multi-factor analysis.
+
+{% if history %}Recent conversation:
+{{ history }}
+{% endif %}
+
+User message: {{ message }}
+
+Answer ONLY with JSON:
+{"route": "...", "confidence": 0.0}

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Assistant</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1d212b;
+    --border: #2a2f3a; --text: #e7eaf0; --muted: #8b93a3;
+    --accent: #5b9cff; --danger: #ff5d5d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    height: 100vh; display: flex; }
+  button { cursor: pointer; font: inherit; }
+  input, textarea { font: inherit; }
+
+  #auth-view { display: none; flex: 1; align-items: center; justify-content: center; }
+  #app-view { display: none; flex: 1; }
+  #auth-view.show { display: flex; } #app-view.show { display: flex; }
+
+  .card { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px; width: 340px; }
+  .card h1 { font-size: 20px; margin-bottom: 4px; }
+  .card p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .card label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  .card input { width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--panel2); color: var(--text); }
+  .btn { border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer;
+    background: var(--accent); color: #fff; font-weight: 600; }
+  .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-block { width: 100%; margin-top: 16px; }
+  .auth-switch { margin-top: 14px; font-size: 13px; color: var(--muted); text-align: center; }
+  .auth-switch a { color: var(--accent); cursor: pointer; }
+
+  #sidebar { width: 280px; border-right: 1px solid var(--border);
+    background: var(--panel); display: flex; flex-direction: column; }
+  #sidebar .brand { padding: 16px; font-weight: 700; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; }
+  #conv-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .conv-item { padding: 10px 12px; border-radius: 8px; margin-bottom: 2px;
+    color: var(--muted); font-size: 13px; cursor: pointer; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; gap: 8px; }
+  .conv-item:hover { background: var(--panel2); color: var(--text); }
+  .conv-item.active { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); }
+  .conv-item .del { color: var(--muted); visibility: hidden; background: none; border: none; }
+  .conv-item:hover .del { visibility: visible; }
+  .conv-item .del:hover { color: var(--danger); }
+  #sidebar .user { padding: 10px 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  #sidebar .user a { color: var(--accent); cursor: pointer; }
+
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat { flex: 1; overflow-y: auto; padding: 24px 40px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 78%; padding: 12px 16px; border-radius: 12px; line-height: 1.55;
+    font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
+  .msg.error { align-self: flex-start; background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+    border-color: color-mix(in srgb, var(--danger) 50%, transparent); color: var(--danger); }
+  .typing { color: var(--muted); align-self: flex-start; font-size: 13px; padding: 12px 16px; }
+  .typing .dot { animation: blink 1.4s infinite both; }
+  .typing .dot:nth-child(2) { animation-delay: .2s; }
+  .typing .dot:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+
+  #composer { padding: 16px 40px 24px; }
+  #composer .box { display: flex; gap: 10px; align-items: flex-end;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 8px; }
+  #composer textarea { flex: 1; resize: none; background: transparent; border: none;
+    outline: none; color: var(--text); font: inherit; max-height: 160px; padding: 8px; }
+  #composer .send { align-self: flex-end; }
+  #start-hint { color: var(--muted); text-align: center; padding: 40px; font-size: 14px; }
+  .scroll-target { height: 1px; }
+</style>
+</head>
+<body>
+
+  <!-- AUTH VIEW -->
+  <div id="auth-view">
+    <div class="card">
+      <h1>AI Assistant</h1>
+      <p id="auth-sub">Masuk untuk melanjutkan</p>
+      <label for="a-email">Email</label>
+      <input id="a-email" type="email" placeholder="you@example.com" />
+      <label for="a-user" style="display:none">Username</label>
+      <input id="a-user" type="text" placeholder="username" style="display:none" />
+      <label for="a-pass">Password</label>
+      <input id="a-pass" type="password" placeholder="min. 8 karakter (huruf + angka)" />
+      <button class="btn btn-block" id="a-btn">Masuk</button>
+      <div class="auth-switch" id="a-hint"></div>
+    </div>
+  </div>
+
+  <!-- APP VIEW -->
+  <div id="app-view">
+    <aside id="sidebar">
+      <div class="brand">
+        <span>AI Assistant</span>
+        <button class="btn secondary" id="new-chat" style="padding:6px 10px;font-size:12px">+ Baru</button>
+      </div>
+      <div id="conv-list"></div>
+      <div class="user"><span id="user-label"></span><a id="logout">keluar</a></div>
+    </aside>
+    <main id="main">
+      <div id="chat"></div>
+      <div id="composer">
+        <div class="box">
+          <textarea id="input" rows="1" placeholder="Tulis pertanyaan… (Enter kirim, Shift+Enter baris baru)"></textarea>
+          <button class="btn send" id="send" disabled>Kirim</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const state = {
+  token: localStorage.getItem("assistant_token") || null,
+  user: JSON.parse(localStorage.getItem("assistant_user") || "null"),
+  current: null,
+  streaming: false,
+};
+
+const api = async (path, opts = {}) => {
+  const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+  if (state.token) headers["Authorization"] = "Bearer " + state.token;
+  const res = await fetch(path, { ...opts, headers });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { const j = await res.json(); detail = j.detail || detail; } catch (_) {}
+    if (path === "/api/v1/auth/login" && res.status === 401) detail = "Email atau password salah.";
+    throw new Error(String(detail));
+  }
+  return res.status === 204 ? null : res.json();
+};
+
+/* ---------------- messages rendering ---------------- */
+const chat = () => $("chat");
+
+function clearChat() {
+  chat().innerHTML = "";
+  const hint = document.createElement("div");
+  hint.id = "start-hint";
+  hint.textContent = "Mulai percakapan baru. Pertanyaan Anda diproses dan dijawab di sini.";
+  chat().appendChild(hint);
+}
+
+function addMsg(role, text) {
+  const hint = $("start-hint"); if (hint) hint.remove();
+  const el = document.createElement("div");
+  el.className = "msg " + role;
+  el.textContent = text;
+  chat().appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+function addTyping() {
+  const el = document.createElement("div");
+  el.className = "typing";
+  el.innerHTML = "<span class='dot'>● </span><span class='dot'>● </span><span class='dot'>●</span>";
+  chat().appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+function scrollToBottom() {
+  chat().scrollTop = chat().scrollHeight;
+}
+
+/* ---------------- auth flow ---------------- */
+let authMode = "login";
+
+$("a-btn").onclick = async () => {
+  const email = $("a-email").value.trim(), pass = $("a-pass").value;
+  const username = $("a-user").value.trim();
+  const body = authMode === "register" ? { email, username, password: pass } : { email, password: pass };
+  $("a-btn").disabled = true;
+  try {
+    const res = await api("/api/v1/auth/" + (authMode === "register" ? "register" : "login"),
+      { method: "POST", body: JSON.stringify(body) });
+    state.token = res.access_token;
+    state.user = res.user;
+    localStorage.setItem("assistant_token", state.token);
+    localStorage.setItem("assistant_user", JSON.stringify(state.user));
+    enterApp();
+  } catch (e) {
+    alert("Gagal: " + e.message);
+  } finally {
+    $("a-btn").disabled = false;
+  }
+};
+
+/* ---------------- conversations ---------------- */
+async function loadConvs() {
+  const list = await api("/api/v1/conversations");
+  const box = $("conv-list");
+  box.innerHTML = "";
+  list.forEach(c => {
+    const item = document.createElement("div");
+    item.className = "conv-item" + (state.current && state.current.id === c.id ? " active" : "");
+    const span = document.createElement("span");
+    span.textContent = c.title;
+    span.style.cssText = "flex:1;overflow:hidden;text-overflow:ellipsis";
+    span.onclick = () => openConv(c.id);
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "×";
+    del.onclick = async e => {
+      e.stopPropagation();
+      await api("/api/v1/conversations/" + c.id, { method: "DELETE" });
+      if (state.current && state.current.id === c.id) { state.current = null; clearChat(); }
+      loadConvs();
+      updateSend();
+    };
+    item.appendChild(span); item.appendChild(del);
+    box.appendChild(item);
+  });
+}
+
+async function newConv() {
+  const res = await api("/api/v1/conversations", { method: "POST", body: JSON.stringify({ title: "Percakapan baru" }) });
+  state.current = res;
+  clearChat();
+  await loadConvs();
+  updateSend();
+}
+
+async function openConv(id) {
+  const res = await api("/api/v1/conversations/" + id);
+  state.current = res;
+  chat().innerHTML = "";
+  res.messages.forEach(m => addMsg(m.role, m.content));
+  if (!res.messages.length) {
+    const hint = document.createElement("div");
+    hint.id = "start-hint";
+    hint.textContent = "Mulai percakapan baru. Pertanyaan Anda diproses dan dijawab di sini.";
+    chat().appendChild(hint);
+  }
+  await loadConvs();
+  updateSend();
+}
+
+/* ---------------- chat SSE streaming ---------------- */
+async function send() {
+  const text = $("input").value.trim();
+  if (!text || !state.current || state.streaming) return;
+  $("input").value = "";
+  $("send").disabled = true;
+  state.streaming = true;
+  updateComposerHeight();
+  addMsg("user", text);
+  const typing = addTyping();
+
+  let assistantEl = null;
+  let done = false;
+  let error = false;
+
+  try {
+    const res = await fetch("/api/v1/conversations/" + state.current.id + "/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + state.token },
+      body: JSON.stringify({ content: text })
+    });
+    if (!res.ok || !res.body) throw new Error("Request gagal (" + res.status + ")");
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done: eof, value } = await reader.read();
+      if (eof) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        for (const line of frame.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const ev = JSON.parse(line.slice(6));
+          if (ev.type === "token") {
+            if (!assistantEl) { typing.remove(); assistantEl = addMsg("assistant", ""); }
+            assistantEl.textContent += ev.delta;
+            scrollToBottom();
+          } else if (ev.type === "done") {
+            done = true;
+          } else if (ev.type === "error") {
+            error = true;
+            if (assistantEl) { assistantEl.remove(); assistantEl = null; }
+            addMsg("error", "\u26A0 " + ev.message);
+          }
+        }
+      }
+    }
+    if (!done && !error) addMsg("error", "\u26A0 Koneksi terputus sebelum jawaban selesai.");
+  } catch (e) {
+    typing.remove();
+    addMsg("error", "\u26A0 " + e.message);
+  } finally {
+    state.streaming = false;
+    updateSend();
+    await loadConvs();
+    const conv = state.current;
+    if (conv) {
+      const detail = await api("/api/v1/conversations/" + conv.id);
+      state.current = detail;
+      chat().innerHTML = "";
+      detail.messages.forEach(m => addMsg(m.role, m.content));
+      scrollToBottom();
+    }
+  }
+}
+
+/* ---------------- wiring ---------------- */
+const input = $("input");
+function addComposerHeight() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px"; }
+input.addEventListener("input", () => { addComposerHeight(); updateSend(); });
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!$("send").disabled) send(); }
+});
+$("send").onclick = send;
+$("new-chat").onclick = newConv;
+$("logout").onclick = () => { localStorage.removeItem("assistant_token"); localStorage.removeItem("assistant_user"); location.reload(); };
+
+function updateSend() {
+  $("send").disabled = state.streaming || !state.current || !input.value.trim();
+}
+
+function enterApp() {
+  $("auth-view").classList.remove("show");
+  $("app-view").classList.add("show");
+  $("user-label").textContent = state.user.username;
+  clearChat();
+  loadConvs();
+  setAuthSwitch();
+}
+
+function setAuthSwitch() {
+  $("a-hint").innerHTML = authMode === "login"
+    ? 'Belum punya akun? <a id="a-toggle">Daftar</a>'
+    : 'Sudah punya akun? <a id="a-toggle">Masuk</a>';
+  $("a-toggle").onclick = () => {
+    authMode = authMode === "login" ? "register" : "login";
+    const isReg = authMode === "register";
+    $("a-user").style.display = isReg ? "" : "none";
+    $("a-btn").textContent = isReg ? "Daftar" : "Masuk";
+    $("auth-sub").textContent = isReg ? "Buat akun baru" : "Masuk untuk melanjutkan";
+    setAuthSwitch();
+  };
+}
+
+setAuthSwitch();
+
+if (state.token && state.user) {
+  $("auth-view").classList.remove("show");
+  $("app-view").classList.add("show");
+  $("user-label").textContent = state.user.username;
+  /* validate token */
+  api("/api/v1/auth/me").then(() => loadConvs()).catch(() => {
+    localStorage.removeItem("assistant_token");
+    localStorage.removeItem("assistant_user");
+    location.reload();
+  });
+  clearChat();
+}
+</script>
+</body>
+</html>

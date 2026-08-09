@@ -1,0 +1,65 @@
+# ============================================================
+# AI Assistant - agents.yaml
+# Definisi agent & route PERMISSION dan konfigurasinya.
+# Dibaca oleh orchestrator pada Phase 4-7. Bersifat declarative,
+# tidak mencampur logika di source code.
+# ============================================================
+
+agents:
+  simple_chat:
+    mode: simple
+    description: "Percakapan umum, menjawab langsung dengan knowledge LLM."
+    model: ${LLM_MODEL:-gpt-4o-mini}
+    temperature: 0.5
+    tools: []
+
+  knowledge_assistant:
+    mode: rag
+    description: "Mengambil knowledge dari vector store, lalu menjawab dengan konteks."
+    model: ${LLM_MODEL:-gpt-4o-mini}
+    tools: ["knowledge"]
+    rag:
+      top_k: 5
+      score_threshold: 0.55
+
+  data_analyst:
+    mode: sql
+    description: "Menjawab pertanyaan data dengan menjalankan SQL yang tervalidasi."
+    model: ${LLM_MODEL:-gpt-4o-mini}
+    tools: ["sql"]
+    sql:
+      read_only: true
+      max_rows: 200
+      allowed_schemas: ["public"]
+
+  deep_analyst:
+    mode: deep
+    description: "Analisis mendalam: planner -> multi-task -> evaluator -> synthesis."
+    tools: ["knowledge", "web_search", "calculator", "sql"]
+    planner:
+      max_tasks: 4
+    executor:
+      max_workers: 2
+    evaluator:
+      min_quality_score: 0.5
+
+# Permission: siapa boleh pakai tool/agent apa.
+# user_id="*" berarti semua user terautentikasi.
+permissions:
+  simple:
+    - user_id: "*"
+      tools: []
+  knowledge:
+    - user_id: "*"
+      tools: []
+  sql:
+    - user_id: "*"
+      tools: ["sql"]
+      read_only: true
+  deep:
+    - user_id: "*"
+      tools: ["knowledge", "calculator", "web_search"]
+    # SQL hanya untuk group tertentu
+    - group: "analyst"
+      tools: ["sql"]
+      read_only: true
